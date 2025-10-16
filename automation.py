@@ -156,7 +156,16 @@ async def main():
                 print(f"✗ Failed to fill Remuneration (Rs.) field: {e}")
                 raise
 
-            
+            # click Add button (S1 Add A)
+            try:
+                await page.wait_for_selector('#btnS1AddA_2', state="visible", timeout=20000)
+                await page.click('#btnS1AddA_2')
+                print("✓ Clicked Add button")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for Add button")
+                raise
+
+
             # Keep the tab open - don't close browser
             print("⏳ Keeping tab open... Press Ctrl+C to exit this script.")
             try:
