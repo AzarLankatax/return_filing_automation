@@ -1,19 +1,55 @@
 """
 Playwright automation script for IRD form filling.
 
-To start Chrome with CDP support:
-Windows: "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --user-data-dir="C:\chrome-cdp"
+This script will:
+1. Start Chrome automatically
+2. Navigate to login page for manual login
+3. Wait for you to log in manually
+4. Automatically proceed to form URL and complete automation
 
-This script attaches to an existing Chrome session and automates the form flow at:
-https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling
+Login URL: https://eservices.ird.gov.lk/Authentication/LoginPersonal
+Form URL: https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling
 """
 
 import asyncio
 from playwright.async_api import async_playwright, TimeoutError as PWTimeoutError
 
 # Constants
-CDP_ENDPOINT = "http://localhost:9222"
+LOGIN_URL = "https://eservices.ird.gov.lk/Authentication/LoginPersonal"
 TARGET_URL = "https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling"
+USER_DATA_DIR = "C:\\chrome-automation"
+
+
+async def wait_for_manual_login(page):
+    """Wait for user to manually log in and navigate to the target page."""
+    print("\n🔐 MANUAL LOGIN REQUIRED")
+    print("=" * 50)
+    print("📝 Please log in manually in the browser window")
+    print("📝 After logging in, navigate to the form page")
+    print("📝 The automation will continue automatically once you reach the form")
+    print("=" * 50)
+    
+    # Wait for user to navigate to the target URL
+    print("⏳ Waiting for you to navigate to the form page...")
+    
+    while True:
+        current_url = page.url
+        if TARGET_URL in current_url:
+            print("✅ Detected navigation to form page!")
+            break
+        
+        # Check if still on login page or other pages
+        if "LoginPersonal" in current_url:
+            print("⏳ Still on login page... please log in")
+        else:
+            print(f"📍 Current page: {current_url}")
+            print("⏳ Please navigate to the form page...")
+        
+        await asyncio.sleep(2)  # Check every 2 seconds
+    
+    # Wait a bit more for page to fully load
+    await page.wait_for_load_state("networkidle")
+    print("✅ Form page loaded successfully!")
 
 
 async def click_popup_button_by_value(page, button_value):
@@ -47,19 +83,31 @@ async def main():
     """Main automation function."""
     async with async_playwright() as p:
         try:
-            print("🔗 Connecting to existing Chrome session...")
-            browser = await p.chromium.connect_over_cdp(CDP_ENDPOINT)
+            print("🚀 Starting Chrome browser...")
+            context = await p.chromium.launch_persistent_context(
+                user_data_dir=USER_DATA_DIR,
+                headless=False,  # Show browser window
+                args=[
+                    "--remote-debugging-port=9222",
+                    "--disable-web-security",
+                    "--disable-features=VizDisplayCompositor",
+                    "--no-first-run",
+                    "--disable-default-apps"
+                ]
+            )
             
             print("📄 Opening new tab...")
-            context = browser.contexts[0] if browser.contexts else await browser.new_context()
             page = await context.new_page()
             
-            print(f"🌐 Navigating to: {TARGET_URL}")
-            await page.goto(TARGET_URL)
+            print(f"🌐 Navigating to login page: {LOGIN_URL}")
+            await page.goto(LOGIN_URL)
             
-            # Wait for page to load
+            # Wait for login page to load
             await page.wait_for_load_state("networkidle")
-            print("✓ Page loaded successfully")
+            print("✅ Login page loaded successfully")
+            
+            # Wait for manual login and navigation to form page
+            await wait_for_manual_login(page)
             
             # Step 1: Set radio buttons
             print("\n📋 Step 1: Setting radio buttons...")
@@ -185,8 +233,11 @@ async def main():
 
 if __name__ == "__main__":
     print("🚀 Starting IRD form automation...")
-    print("⚠️  Make sure Chrome is running with: --remote-debugging-port=9222")
-    print("⚠️  Ensure you're logged in and on the target page before running this script")
+    print("📝 This script will:")
+    print("   1. Start Chrome automatically")
+    print("   2. Navigate to login page")
+    print("   3. Wait for you to log in manually")
+    print("   4. Automatically proceed to form and complete automation")
     print("-" * 60)
     
     asyncio.run(main())
