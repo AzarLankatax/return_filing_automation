@@ -3,9 +3,10 @@ Playwright automation script for IRD form filling.
 
 This script will:
 1. Start Chrome automatically
-2. Navigate to login page for manual login
-3. Wait for you to log in manually
-4. Automatically proceed to form URL and complete automation
+2. Navigate to login page
+3. Automatically fill Tax Reference Number and IRD PIN
+4. Wait for you to complete CAPTCHA and click login
+5. Automatically proceed to form URL and complete automation
 
 Login URL: https://eservices.ird.gov.lk/Authentication/LoginPersonal
 Form URL: https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling
@@ -106,8 +107,56 @@ async def main():
             await page.wait_for_load_state("networkidle")
             print("✅ Login page loaded successfully")
             
-            # Wait for manual login and navigation to form page
-            await wait_for_manual_login(page)
+            # Automatic login
+            print("\n🔐 Starting automatic login...")
+            
+            # Fill Tax Reference Number
+            try:
+                await page.wait_for_selector("#MyTaxReferNo", state="visible", timeout=20000)
+                await page.fill("#MyTaxReferNo", "103136962")
+                print("✓ Tax Reference Number filled: 103136962")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for Tax Reference Number field")
+                raise
+            
+            # Fill IRD PIN
+            try:
+                await page.wait_for_selector("#MyIRDPIN", state="visible", timeout=20000)
+                await page.fill("#MyIRDPIN", "Yogar950")
+                print("✓ IRD PIN filled")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for IRD PIN field")
+                raise
+            
+            # Wait for captcha to be filled manually
+            print("\n🔐 CAPTCHA REQUIRED")
+            print("=" * 50)
+            print("📝 Please fill in the CAPTCHA manually")
+            print("📝 After filling CAPTCHA, click the login button")
+            print("📝 The automation will continue automatically")
+            print("=" * 50)
+            
+            # Wait for user to navigate to the target URL (after successful login)
+            print("⏳ Waiting for successful login and navigation to form page...")
+            
+            while True:
+                current_url = page.url
+                if TARGET_URL in current_url:
+                    print("✅ Detected navigation to form page!")
+                    break
+                
+                # Check if still on login page
+                if "LoginPersonal" in current_url:
+                    print("⏳ Still on login page... please complete login")
+                else:
+                    print(f"📍 Current page: {current_url}")
+                    print("⏳ Please complete login and navigate to form page...")
+                
+                await asyncio.sleep(2)  # Check every 2 seconds
+            
+            # Wait a bit more for page to fully load
+            await page.wait_for_load_state("networkidle")
+            print("✅ Form page loaded successfully!")
             
             # Step 1: Set radio buttons
             print("\n📋 Step 1: Setting radio buttons...")
@@ -164,6 +213,9 @@ async def main():
             
             # Step 5: Fill Schedule 1 form
             print("\n📋 Step 5: Filling Schedule 1 form...")
+
+            # Part 1: Details of Employment income (S1)
+            print("\n📋 Part 1: Details of Employment income (S1)...")
             
             # Employer/company name	
             try:
@@ -213,6 +265,65 @@ async def main():
                 print("✗ Timeout waiting for Add button")
                 raise
 
+            # Part 2: Employment Income (S1)
+            print("\n📋 Part 2: Employment Income (S1)...")
+
+            # TIN of the employer	
+            try:
+                await page.wait_for_selector('input[name="Schedule1CModel.Sch1_2021Cage113"]', state="visible", timeout=20000)
+                await page.fill('input[name="Schedule1CModel.Sch1_2021Cage113"]', "103136962")
+                print("✓ TIN of the employer ID field: 103136962")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for TIN of the employer ID field")
+                raise
+            
+            # Amount (Rs.) field (Cage 114)
+            try:
+                await page.wait_for_selector('input[name="Schedule1CModel.Sch1_2021Cage114"]', state="visible", timeout=20000)
+                await page.fill('input[name="Schedule1CModel.Sch1_2021Cage114"]', "50000")
+                print("✓ Amount (Rs.) field: 50000")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for Amount (Rs.) field")
+                raise
+            
+
+
+
+            # Scroll to bottom and click Next
+            print("\n📋 Clicking Next button...")
+            try:
+                await page.wait_for_selector("#btnNext", state="visible", timeout=20000)
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(1000)  # Wait for scroll
+                await page.click("#btnNext")
+                print("✓ Clicked Next button")
+            except PWTimeoutError:
+                print("✗ Timeout waiting for Next button")
+                raise
+            
+            # Step 3: Handle confirmation popup
+            print("\n📋 Handling confirmation popup...")
+            await click_popup_button_by_value(page, "Yes")
+            
+            # Step 4: Handle info popup
+            print("\n📋 Handling info popup...")
+            try:
+                await click_popup_button_by_value(page, "Ok")
+            except PWTimeoutError:
+                # Try alternative spelling
+                try:
+                    await click_popup_button_by_value(page, "OK")
+                except PWTimeoutError:
+                    print("✗ Could not find Ok/OK popup button")
+                    raise
+            
+            # Wait for Schedule 1 to load
+            await page.wait_for_load_state("networkidle")
+            print("✓ Schedule 1 component loaded")
+            
+            # Fill Schedule 2 form
+            print("\n📋 Filling Schedule 2 form...")
+
 
             # Keep the tab open - don't close browser
             print("⏳ Keeping tab open... Press Ctrl+C to exit this script.")
@@ -236,8 +347,9 @@ if __name__ == "__main__":
     print("📝 This script will:")
     print("   1. Start Chrome automatically")
     print("   2. Navigate to login page")
-    print("   3. Wait for you to log in manually")
-    print("   4. Automatically proceed to form and complete automation")
+    print("   3. Automatically fill Tax Reference Number and IRD PIN")
+    print("   4. Wait for you to complete CAPTCHA and click login")
+    print("   5. Automatically proceed to form and complete automation")
     print("-" * 60)
     
     asyncio.run(main())
