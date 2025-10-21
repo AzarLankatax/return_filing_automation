@@ -1,18 +1,15 @@
 """
 Automation Script for IRD Form Filling
 
-This script will:
-1. Connect to existing Chrome browser (must be running from browser_setup.py)
-2. Open new tab and navigate to form URL
-3. Automatically fill the IRD form
-4. Keep browser open after completion
-5. Only logout when browser window is manually closed
+This script uses the new component-based architecture for IRD form automation.
+It orchestrates all UI components to complete the form filling process.
 
 Form URL: https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling
 """
 
 import asyncio
 from playwright.async_api import async_playwright, TimeoutError as PWTimeoutError
+from ui_components import ComponentManager
 
 # Constants
 TARGET_URL = "https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling"
@@ -404,7 +401,7 @@ async def run_automation(page, context):
         print("✓ Schedule 1 component loaded")
         
         # Schedule 1 component section
-
+        
         # Step 5: Fill Schedule 1 form
         print("\n📋 Step 5: Filling Schedule 1 form...")
 
