@@ -7,6 +7,8 @@ This script will:
 3. Automatically fill Tax Reference Number and IRD PIN
 4. Wait for you to complete CAPTCHA and click login
 5. Automatically proceed to form URL and complete automation
+6. Keep the session active until browser tab is closed
+7. Automatically logout when browser tab is closed
 
 Login URL: https://eservices.ird.gov.lk/Authentication/LoginPersonal
 Form URL: https://eservices.ird.gov.lk/Assessment/IIT2/ReturnFiling
@@ -78,6 +80,22 @@ async def fill_numeric_input(page, selector, value):
     except PWTimeoutError:
         print(f"✗ Timeout waiting for numeric input: {selector}")
         raise
+
+
+async def logout_user(page):
+    """Logout the user by clicking the logout button."""
+    try:
+        print("🔓 Logging out user...")
+        # Look for the logout link using the provided HTML structure
+        logout_selector = 'a.r-login.r-link-login[href="/Authentication/Logout"]'
+        await page.wait_for_selector(logout_selector, state="visible", timeout=10000)
+        await page.click(logout_selector)
+        print("✓ Successfully logged out")
+        await page.wait_for_timeout(2000)  # Wait for logout to complete
+    except PWTimeoutError:
+        print("✗ Could not find logout button or logout failed")
+    except Exception as e:
+        print(f"✗ Error during logout: {str(e)}")
 
 
 async def main():
@@ -325,13 +343,34 @@ async def main():
             print("\n📋 Filling Schedule 2 form...")
 
 
-            # Keep the tab open - don't close browser
-            print("⏳ Keeping tab open... Press Ctrl+C to exit this script.")
+            # Set up tab close detection and logout functionality
+            print("⏳ Keeping tab open... The automation will logout when you close the browser tab.")
+            print("📝 Press Ctrl+C to exit this script without logging out.")
+            
+            # Set up event listeners for tab close detection
+            async def handle_tab_close():
+                """Handle tab close event by logging out."""
+                try:
+                    await logout_user(page)
+                except Exception as e:
+                    print(f"✗ Error during logout on tab close: {str(e)}")
+            
+            # Add event listener for page close
+            page.on("close", lambda: asyncio.create_task(handle_tab_close()))
+            
+            # Add event listener for browser context close
+            context.on("close", lambda: asyncio.create_task(handle_tab_close()))
+            
             try:
                 while True:
+                    # Check if page is still open
+                    if page.is_closed():
+                        print("🔓 Tab was closed - logging out...")
+                        await logout_user(page)
+                        break
                     await asyncio.sleep(1)
             except KeyboardInterrupt:
-                print("\n👋 Script terminated by user")
+                print("\n👋 Script terminated by user - keeping session active")
             
         except Exception as e:
             print(f"\n❌ Error during automation: {str(e)}")
@@ -350,6 +389,8 @@ if __name__ == "__main__":
     print("   3. Automatically fill Tax Reference Number and IRD PIN")
     print("   4. Wait for you to complete CAPTCHA and click login")
     print("   5. Automatically proceed to form and complete automation")
+    print("   6. Keep session active until browser tab is closed")
+    print("   7. Automatically logout when browser tab is closed")
     print("-" * 60)
     
     asyncio.run(main())
