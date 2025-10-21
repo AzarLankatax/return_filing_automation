@@ -154,9 +154,190 @@ async def save_draft_schedule01(page) -> None:
         except PWTimeoutError:
             print("⚠ Info dialog with Ok/OK not found; verify draft state manually")
 
+# ---------- Schedule 02 helpers ----------
+async def select_kendo_dropdown_by_cage(page, cage: str, option_text: str, timeout=12000):
+    """Open a Kendo dropdown identified by input[cage="<cage>"] and select by visible text."""
+    host = page.locator(f'span.k-dropdown:has(input[cage="{cage}"])').first
+    await host.wait_for(state="visible", timeout=timeout)
+    # open the dropdown
+    await host.locator(".k-dropdown-wrap .k-select, .k-dropdown-wrap .k-icon, .k-dropdown-wrap").first.click()
+    # choose from the topmost open list
+    listbox = page.locator(".k-animation-container:visible .k-list, .k-animation-container:visible [role='listbox']").last
+    await listbox.wait_for(state="visible", timeout=timeout)
+    await listbox.locator(f'li.k-item:has-text("{option_text}"), [role="option"]:has-text("{option_text}")').first.click()
+    await page.wait_for_timeout(200)
+
+async def fill_text_by_cage(page, cage: str, value: str, timeout=12000):
+    """Fill a plain text input identified by input[cage="<cage>"]."""
+    el = await page.wait_for_selector(f'input[cage="{cage}"]', state="visible", timeout=timeout)
+    await el.click()
+    await el.press("Control+A")
+    await el.press("Backspace")
+    await el.type(value)
+
+async def fill_kendo_numeric_by_cage(page, cage: str, value, timeout=12000):
+    """Type into a Kendo NumericTextBox identified by input[cage="<cage>"] (inside span.k-numerictextbox)."""
+    host = await page.wait_for_selector(f'span.k-numerictextbox:has(input[cage="{cage}"])', timeout=timeout)
+    field = await host.query_selector("input.k-formatted-value")
+    await field.click()
+    await field.press("Control+A")
+    await field.press("Backspace")
+    await field.type(str(value))
+    await field.press("Tab")  # commit
+
+async def save_draft_schedule02(page) -> None:
+    """In Schedule 02: click 'Save draft' → confirm 'Yes' → Info 'Ok'."""
+    container = page.locator("#Schedule02Container")
+    await container.wait_for(state="visible", timeout=20000)
+
+    save_btn = container.locator("input[type='button'][value='Save draft'], button:has-text('Save draft')").first
+    await save_btn.scroll_into_view_if_needed()
+    await save_btn.click()
+    print("✓ Clicked 'Save draft' (Schedule 02)")
+
+    # Confirm
+    try:
+        await click_topmost_dialog_button(page, "Yes", timeout=12000)
+        print("✓ Confirmed 'Yes' on save dialog (S2)")
+    except PWTimeoutError:
+        print("⏳ No confirmation dialog (S2); continuing...")
+
+    # Info OK
+    try:
+        info_dlg = page.locator(".k-window:has-text('Info'), div[role='dialog']:has-text('Info'), .k-window:has(input[value='Ok'], button:has-text('Ok'))").last
+        await info_dlg.wait_for(state="visible", timeout=10000)
+        await click_topmost_dialog_button(page, "Ok", timeout=5000)
+        print("✓ Acknowledged 'Ok' on info dialog (S2 draft saved)")
+    except PWTimeoutError:
+        try:
+            await click_topmost_dialog_button(page, "OK", timeout=3000)
+            print("✓ Acknowledged 'OK' on info dialog (S2 draft saved)")
+        except PWTimeoutError:
+            print("⚠ Info dialog (Ok/OK) not found for S2; verify draft manually")
 
 
-async def run_automation(page):
+async def run_schedule02_automation(page, context):
+    """
+    Run Schedule 02 automation after Schedule 01 completion.
+    
+    Args:
+        page: Current page object
+        context: Browser context for creating new tabs
+    """
+    try:
+        print("\n🚀 Starting Schedule 02 automation...")
+        
+        # Open new tab and navigate to the form URL
+        print("📄 Opening new tab for Schedule 02...")
+        schedule02_page = await context.new_page()
+        
+        # Navigate to the form URL
+        print(f"🌐 Navigating to form URL: {TARGET_URL}")
+        await schedule02_page.goto(TARGET_URL)
+        await schedule02_page.wait_for_load_state("networkidle")
+        print("✅ Form page loaded successfully")
+        
+        # Wait for the page to be ready
+        await schedule02_page.wait_for_timeout(2000)
+        
+        # Click on Schedule 02 tab
+        print("🔍 Looking for Schedule 02 tab...")
+        schedule02_selector = 'a[href="javascript:void(0)"][onclick*="tabStrip.select(tabSchedule2)"]'
+        
+        try:
+            await schedule02_page.wait_for_selector(schedule02_selector, state="visible", timeout=15000)
+            await schedule02_page.click(schedule02_selector)
+            print("✓ Successfully clicked Schedule 02 tab")
+            
+            # Wait for Schedule 02 container to be visible
+            await schedule02_page.wait_for_selector("#Schedule02Container", state="visible", timeout=15000)
+            print("✓ Schedule 02 container is now visible")
+            
+        except PWTimeoutError:
+            print("⚠️ Schedule 02 tab not found with primary selector, trying alternative...")
+            # Try alternative selector
+            alt_selector = 'a:has-text("(Schedule 2)")'
+            try:
+                await schedule02_page.wait_for_selector(alt_selector, state="visible", timeout=10000)
+                await schedule02_page.click(alt_selector)
+                print("✓ Successfully clicked Schedule 02 tab using alternative selector")
+                
+                # Wait for Schedule 02 container to be visible
+                await schedule02_page.wait_for_selector("#Schedule02Container", state="visible", timeout=15000)
+                print("✓ Schedule 02 container is now visible")
+                
+            except PWTimeoutError:
+                print("❌ Could not find Schedule 02 tab")
+                print("📝 Please manually click on Schedule 02 tab")
+                # Wait for user to manually click
+                await schedule02_page.wait_for_selector("#Schedule02Container", state="visible", timeout=30000)
+                print("✓ Schedule 02 container is now visible (manual click detected)")
+        
+        # Wait a moment for the form to load
+        await schedule02_page.wait_for_timeout(2000)
+        
+        # Fill Schedule 02 form fields
+        print("\n📋 Filling Schedule 02 form fields...")
+        
+        # 201: Activity code (dropdown)
+        try:
+            await select_kendo_dropdown_by_cage(schedule02_page, "201", "702000-MANAGEMENT CONSULTANCY ACTIVITIES")
+            print("✓ [201] Activity code selected: 702000-MANAGEMENT CONSULTANCY ACTIVITIES")
+        except Exception as e:
+            print(f"⚠️ Error selecting activity code: {e}")
+            print("📝 Please select activity code manually")
+        
+        # 202: Nature of the business (text)
+        try:
+            await fill_text_by_cage(schedule02_page, "202", "Consulting services")
+            print("✓ [202] Nature of the business filled")
+        except Exception as e:
+            print(f"⚠️ Error filling nature of business: {e}")
+            print("📝 Please fill nature of business manually")
+        
+        # 203: Gains and profits (Rs.) (numeric)
+        try:
+            await fill_kendo_numeric_by_cage(schedule02_page, "203", 150000)
+            print("✓ [203] Gains and profits (Rs.) filled: 150000")
+        except Exception as e:
+            print(f"⚠️ Error filling gains and profits: {e}")
+            print("📝 Please fill gains and profits manually")
+        
+        # 204A: Total business turnover (Rs.) (numeric)
+        try:
+            await fill_kendo_numeric_by_cage(schedule02_page, "204A", 2000000)
+            print("✓ [204A] Total business turnover (Rs.) filled: 2000000")
+        except Exception as e:
+            print(f"⚠️ Error filling total business turnover: {e}")
+            print("📝 Please fill total business turnover manually")
+        
+        # Save draft for Schedule 02
+        print("\n📋 Saving draft for Schedule 02...")
+        try:
+            await save_draft_schedule02(schedule02_page)
+            print("✓ Draft saved for Schedule 02")
+        except Exception as e:
+            print(f"⚠️ Error saving Schedule 02 draft: {e}")
+            print("📝 Please save draft manually")
+        
+        print("✅ Schedule 02 automation completed successfully!")
+        
+        # Close the Schedule 02 tab
+        await schedule02_page.close()
+        print("✓ Schedule 02 tab closed")
+        
+    except Exception as e:
+        print(f"❌ Error during Schedule 02 automation: {str(e)}")
+        print("📝 Please complete Schedule 02 manually if needed")
+        # Try to close the tab if it exists
+        try:
+            if 'schedule02_page' in locals():
+                await schedule02_page.close()
+        except:
+            pass
+
+
+async def run_automation(page, context):
     """Run the form filling automation."""
     try:
         print(f"🌐 Navigating to form page: {TARGET_URL}")
@@ -165,6 +346,9 @@ async def run_automation(page):
         # Wait for page to load
         await page.wait_for_load_state("networkidle")
         print("✅ Form page loaded successfully!")
+        
+        # Main Return component section
+        print("\n📋 Main Return component section...")
         
         # Step 1: Set radio buttons
         print("\n📋 Step 1: Setting radio buttons...")
@@ -219,6 +403,8 @@ async def run_automation(page):
         await page.wait_for_load_state("networkidle")
         print("✓ Schedule 1 component loaded")
         
+        # Schedule 1 component section
+
         # Step 5: Fill Schedule 1 form
         print("\n📋 Step 5: Filling Schedule 1 form...")
 
@@ -357,12 +543,17 @@ async def run_automation(page):
         print("\n📋 Saving draft for Schedule 01...")
         await save_draft_schedule01(page)
         print("✓ Draft saved for Schedule 01")
-
-
-
         
-        # Fill Schedule 2 form
-        print("\n📋 Filling Schedule 2 form...")
+        # After Schedule 01 completion, proceed to Schedule 02
+        print("\n🔄 Proceeding to Schedule 02 automation...")
+        await run_schedule02_automation(page, context)
+
+
+
+
+
+
+
 
         print("✅ Automation completed successfully!")
         
@@ -385,7 +576,7 @@ async def main():
         page = await context.new_page()
         
         # Run the automation
-        await run_automation(page)
+        await run_automation(page, context)
         
         # Keep the browser open and set up logout on browser close
         print("\n⏳ Automation completed! Browser will stay open.")

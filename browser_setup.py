@@ -29,8 +29,8 @@ USER_DATA_DIR = "C:\\chrome-automation"
 # =============================================================================
 # USER CREDENTIALS - CHANGE THESE VALUES AS NEEDED
 # =============================================================================
-TAX_REFERENCE_NUMBER = "106298408"  # Change this to your Tax Reference Number
-IRD_PIN = "Judet568"                # Change this to your IRD PIN
+TAX_REFERENCE_NUMBER = "103136962"  # Change this to your Tax Reference Number
+IRD_PIN = "Yogar950"                # Change this to your IRD PIN
 # =============================================================================
 
 
