@@ -248,52 +248,133 @@ async def run_automation(page):
 
         # Click Add button
         try:
-            # Look for various possible Add button selectors
-            add_button_selectors = [
-                'button:has-text("Add")',
-                'input[type="button"][value*="Add"]',
-                'button[id*="Add"]',
-                'input[id*="Add"]',
-                'button:has-text("ADD")',
-                'input[value*="ADD"]'
-            ]
-            
-            add_button_clicked = False
-            for selector in add_button_selectors:
-                try:
-                    await page.wait_for_selector(selector, state="visible", timeout=5000)
-                    await page.click(selector)
-                    print(f"✓ Clicked Add button using selector: {selector}")
-                    add_button_clicked = True
-                    break
-                except PWTimeoutError:
-                    continue
-            
-            if not add_button_clicked:
-                print("⚠ Could not find Add button - may need manual click")
+            # Use the specific button ID provided
+            await page.wait_for_selector('#btnS1AddC_2', state="visible", timeout=20000)
+            await page.click('#btnS1AddC_2')
+            print("✓ Clicked Add button (btnS1AddC_2)")
+        except PWTimeoutError:
+            print("✗ Timeout waiting for Add button (btnS1AddC_2)")
+            # Try fallback selectors
+            try:
+                print("🔄 Trying fallback selectors...")
+                fallback_selectors = [
+                    'input[type="button"][value="Add"]',
+                    'button:has-text("Add")',
+                    'input[id*="Add"]'
+                ]
                 
+                add_button_clicked = False
+                for selector in fallback_selectors:
+                    try:
+                        await page.wait_for_selector(selector, state="visible", timeout=5000)
+                        await page.click(selector)
+                        print(f"✓ Clicked Add button using fallback selector: {selector}")
+                        add_button_clicked = True
+                        break
+                    except PWTimeoutError:
+                        continue
+                
+                if not add_button_clicked:
+                    print("⚠ Could not find Add button with any selector - may need manual click")
+                    
+            except Exception as e:
+                print(f"⚠ Error with fallback selectors: {e}")
+                print("📝 Please click Add button manually if needed")
         except Exception as e:
             print(f"⚠ Error clicking Add button: {e}")
             print("📝 Please click Add button manually if needed")
 
-        # Scroll to bottom and click Next
-        print("\n📋 Clicking Next button...")
+        # Step 6: Click Next button (inside Schedule01Container)
+        print("\n📋 Step 6: Clicking Next button...")
         try:
-            await page.wait_for_selector("#btnNext", state="visible", timeout=20000)
+            # First, ensure we're in the Schedule01Container context
+            print("🔍 Looking for Schedule01Container...")
+            await page.wait_for_selector("#Schedule01Container", state="visible", timeout=20000)
+            print("✓ Found Schedule01Container")
+            
+            # Wait for Next button within the container
+            await page.wait_for_selector("#Schedule01Container #btnNext", state="visible", timeout=20000)
+            print("✓ Found Next button within Schedule01Container")
+            
+            # Scroll to bottom to ensure button is visible
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1000)  # Wait for scroll
-            await page.click("#btnNext")
-            print("✓ Clicked Next button")
-        except PWTimeoutError:
-            print("✗ Timeout waiting for Next button")
-            raise
+            await page.wait_for_timeout(2000)  # Wait for scroll
+            
+            # Try JavaScript execution approach for container-specific button
+            print("🔄 Trying JavaScript execution for Next button in container...")
+            result = await page.evaluate("""
+                () => {
+                    // Find the Schedule01Container first
+                    const container = document.getElementById('Schedule01Container');
+                    if (!container) {
+                        console.log('Schedule01Container not found');
+                        return 'container_not_found';
+                    }
+                    
+                    // Look for Next button within the container
+                    const btnNext = container.querySelector('#btnNext');
+                    if (btnNext && btnNext.offsetParent !== null) {
+                        console.log('Found btnNext within Schedule01Container');
+                        btnNext.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => btnNext.click(), 500);
+                        return 'clicked_by_id';
+                    }
+                    
+                    // Try by value within container
+                    const nextByValue = container.querySelector('input[type="button"][value="Next"]');
+                    if (nextByValue && nextByValue.offsetParent !== null) {
+                        console.log('Found Next button by value within container');
+                        nextByValue.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setTimeout(() => nextByValue.click(), 500);
+                        return 'clicked_by_value';
+                    }
+                    
+                    return 'not_found';
+                }
+            """)
+            
+            if result == 'container_not_found':
+                print("✗ Schedule01Container not found")
+                raise Exception("Schedule01Container not found")
+            elif result != 'not_found':
+                print(f"✓ Clicked Next button using JavaScript: {result}")
+                await page.wait_for_timeout(3000)  # Wait for page to respond
+            else:
+                print("⚠ JavaScript approach didn't find Next button in container")
+                # Fallback to direct click
+                await page.click("#Schedule01Container #btnNext")
+                print("✓ Clicked Next button using direct selector")
+                await page.wait_for_timeout(2000)
+                
+        except Exception as js_error:
+            print(f"⚠ JavaScript approach failed: {js_error}")
+            
+            # Fallback to Playwright approach
+            print("🔄 Trying Playwright approach for Next button in container...")
+            try:
+                # Try clicking the button within the container
+                await page.click("#Schedule01Container #btnNext")
+                print("✓ Clicked Next button using Playwright container selector")
+                await page.wait_for_timeout(2000)
+                
+            except Exception as pw_error:
+                print(f"⚠ Playwright container approach failed: {pw_error}")
+                
+                # Last resort: try without container specificity
+                try:
+                    await page.click("#btnNext")
+                    print("✓ Clicked Next button using fallback selector")
+                    await page.wait_for_timeout(2000)
+                except Exception as fallback_error:
+                    print(f"✗ All approaches failed: {fallback_error}")
+                    print("📝 Please click Next button manually")
         
         # Step 3: Handle confirmation popup
-        print("\n📋 Handling confirmation popup...")
+        print("\n📋 Step 3: Handling confirmation popup...")
         await click_popup_button_by_value(page, "Yes")
         
         # Step 4: Handle info popup
-        print("\n📋 Handling info popup...")
+        print("\n📋 Step 4: Handling info popup...")
         try:
             await click_popup_button_by_value(page, "Ok")
         except PWTimeoutError:
@@ -303,6 +384,7 @@ async def run_automation(page):
             except PWTimeoutError:
                 print("✗ Could not find Ok/OK popup button")
                 raise
+        
         
         # Wait for Schedule 1 to load
         await page.wait_for_load_state("networkidle")
