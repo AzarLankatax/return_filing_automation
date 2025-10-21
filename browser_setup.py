@@ -73,8 +73,8 @@ async def main():
             # Fill Tax Reference Number
             try:
                 await page.wait_for_selector("#MyTaxReferNo", state="visible", timeout=20000)
-                await page.fill("#MyTaxReferNo", "103136962")
-                print("✓ Tax Reference Number filled: 103136962")
+                await page.fill("#MyTaxReferNo", "106298408")
+                print("✓ Tax Reference Number filled: 106298408")
             except PWTimeoutError:
                 print("✗ Timeout waiting for Tax Reference Number field")
                 raise
@@ -82,8 +82,8 @@ async def main():
             # Fill IRD PIN
             try:
                 await page.wait_for_selector("#MyIRDPIN", state="visible", timeout=20000)
-                await page.fill("#MyIRDPIN", "Yogar950")
-                print("✓ IRD PIN filled: Yogar950")
+                await page.fill("#MyIRDPIN", "Judet568")
+                print("✓ IRD PIN filled: Judet568")
             except PWTimeoutError:
                 print("✗ Timeout waiting for IRD PIN field")
                 raise
